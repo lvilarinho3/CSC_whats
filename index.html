@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Serviços CSC - Teste WhatsApp API (FRONTEND-ONLY)</title>
+  <meta name="theme-color" content="#0F1724">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    :root{--bg:#0F1724;--card:#111827;--text:#E5E7EB;--muted:#9CA3AF;--accent:#10B981;--accent-press:#059669;--ring:#1F2937}
+    *{box-sizing:border-box} html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Helvetica Neue,Arial;
+      background: radial-gradient(1200px 800px at 80% -10%, #122031 0%, var(--bg) 60%); color:var(--text);
+      display:grid;place-items:center;padding:24px}
+    .card{width:min(980px,92vw);background:linear-gradient(180deg,#121A28 0%,#0F1724 100%);border:1px solid var(--ring);
+      border-radius:24px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    header{display:flex;align-items:center;gap:16px;margin-bottom:8px;flex-wrap:wrap}
+    .logo{max-width:220px;height:auto}
+    h1{margin:0;font-size:26px} p{margin:6px 0 0;color:var(--muted)}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+    input, textarea, select{width:100%;padding:14px 16px;border-radius:12px;border:1px solid #223145;background:#0D1522;color:var(--text);outline:none}
+    label{font-size:14px;color:#c7cdd6}
+    .cta{margin-top:18px;display:flex;gap:12px;flex-wrap:wrap}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:14px 18px;border-radius:14px;font-weight:700;
+      background:var(--accent);color:#052014;border:none;cursor:pointer;text-decoration:none;transition:transform .06s ease,filter .2s;
+      box-shadow:0 6px 16px rgba(16,185,129,.25)}
+    .btn:active{transform:translateY(1px);background:var(--accent-press)}
+    .btn.secondary{background:#1F2A3A;color:var(--text);box-shadow:none;border:1px solid #223145}
+    pre{white-space:pre-wrap;background:#0b1220;border:1px solid #223145;border-radius:12px;padding:12px;color:#d1d5db;max-height:240px;overflow:auto}
+    .warn{background:#3b1d1d;color:#ffd1d1;border:1px solid #7a2d2d;padding:12px;border-radius:10px;margin:10px 0;font-size:14px}
+    @media (max-width:720px){.row{grid-template-columns:1fr} header{justify-content:center;text-align:center}}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <header>
+      <img src="logo.png" class="logo" alt="Logo Serviços CSC">
+      <div>
+        <h1>Serviços CSC — Teste WhatsApp API (Frontend)</h1>
+        <p>ENVIO DE TESTE via Graph API direto do navegador. <strong>Não usar em produção.</strong></p>
+      </div>
+    </header>
+
+    <div class="warn">
+      Este modo <strong>expõe o token no código</strong> e pode falhar por <strong>CORS</strong> em alguns navegadores. Use apenas para testes rápidos.
+    </div>
+
+    <section>
+      <div class="row">
+        <div>
+          <label for="to">Número do cliente (DDI+DDD+número)</label>
+          <input id="to" placeholder="Ex.: 5511999998888" inputmode="numeric" pattern="\d*">
+        </div>
+        <div>
+          <label for="mode">Modo</label>
+          <select id="mode">
+            <option value="text">Texto (janela 24h)</option>
+            <option value="template">Template (iniciar conversa)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" id="rowMsg">
+        <div>
+          <label for="mensagem">Mensagem de texto</label>
+          <input id="mensagem" placeholder="Olá! Quero atendimento sobre Serviços CSC.">
+        </div>
+        <div>
+          <label for="template">Template</label>
+          <input id="template" value="hello_world">
+        </div>
+      </div>
+
+      <div class="cta">
+        <button class="btn" id="enviar">Enviar pela API</button>
+        <a id="wa" class="btn secondary" href="#" rel="noopener">Abrir WhatsApp (fallback)</a>
+      </div>
+
+      <p id="status"></p>
+      <pre id="resp" aria-live="polite"></pre>
+    </section>
+  </main>
+
+  <script>
+    const TOKEN = "EAASayDlHWZCEBPhEXZAaUeSGzkSYvYaO63viDosTIqi30JPYDWK5h4YEAi48ZCzWvJBJRW2tuHlvDjzydWQzbI0iZBcXN1WWBH1EZBlDS341EhP8ZB5ptNWPxJnMVAD99aGXfPcSZBCPNvpB4ZCPxi22sLm5hvJZAYNArCYPxTBPuM0umje7JK3fhaoi4McmgyIdVLrHRHxwW0kE49crCb1ztBAIHrKPkuN7IM1QZD"; // TESTE APENAS
+    const PHONE_NUMBER_ID = "812678541924463";
+
+    const toEl = document.getElementById('to');
+    const msgEl = document.getElementById('mensagem');
+    const tplEl = document.getElementById('template');
+    const modeEl = document.getElementById('mode');
+    const enviarBtn = document.getElementById('enviar');
+    const wa = document.getElementById('wa');
+    const statusEl = document.getElementById('status');
+    const respEl = document.getElementById('resp');
+
+    function updateFallback(){
+      const to = (toEl.value||'').replace(/\D/g,'');
+      const text = encodeURIComponent((msgEl.value||'Olá!'));
+      wa.href = to ? `https://wa.me/${to}?text=${text}` : '#';
+    }
+    toEl.addEventListener('input', updateFallback);
+    msgEl.addEventListener('input', updateFallback);
+    updateFallback();
+
+    async function sendText(to, body){
+      const url = `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`;
+      const payload = {{ messaging_product:"whatsapp", to, type:"text", text:{{ body }} }};
+      const r = await fetch(url, {{ method:"POST",
+        headers:{{ "Authorization": "Bearer " + TOKEN, "Content-Type":"application/json" }},
+        body: JSON.stringify(payload)
+      }});
+      const j = await r.json();
+      return {{ ok: r.ok, status: r.status, body: j }};
+    }
+
+    async function sendTemplate(to, name, lang="pt_BR"){
+      const url = `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`;
+      const payload = {{ messaging_product:"whatsapp", to, type:"template",
+        template:{{ name, language:{{ code: lang }} }} }};
+      const r = await fetch(url, {{ method:"POST",
+        headers:{{ "Authorization": "Bearer " + TOKEN, "Content-Type":"application/json" }},
+        body: JSON.stringify(payload)
+      }});
+      const j = await r.json();
+      return {{ ok: r.ok, status: r.status, body: j }};
+    }
+
+    enviarBtn.addEventListener('click', async () => {{
+      statusEl.textContent = 'Enviando...'; respEl.textContent='';
+      const to = (toEl.value||'').replace(/\D/g,'');
+      if(!to){{ statusEl.textContent = 'Informe o número do cliente.'; return; }}
+
+      try{{
+        let result;
+        if(modeEl.value === 'text'){{
+          const text = (msgEl.value||'Olá!').slice(0,1000);
+          result = await sendText(to, text);
+        }} else {{
+          const name = (tplEl.value||'hello_world');
+          result = await sendTemplate(to, name, 'pt_BR');
+        }}
+        statusEl.textContent = result.ok ? 'OK' : 'Erro ' + result.status;
+        respEl.textContent = JSON.stringify(result.body, null, 2);
+      }}catch(e){{
+        statusEl.textContent = 'Falha de rede/CORS';
+        respEl.textContent = String(e);
+      }}
+    }});
+
+    if ('serviceWorker' in navigator) {{
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+    }}
+  </script>
+</body>
+</html>
